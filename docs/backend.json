@@ -1,0 +1,170 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's profile information.",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "The user's unique username."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "photoURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "activatedProducts": {
+          "type": "object",
+          "description": "Map of activated products to their ISO 8601 expiration dates.",
+          "additionalProperties": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "required": [
+        "username",
+        "email"
+      ]
+    },
+    "sensitivity": {
+      "title": "Sensitivity Profile",
+      "description": "Stores a user's generated sensitivity settings.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A name for the sensitivity profile. Defaults to device name."
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ]
+        },
+        "device": {
+          "type": "string"
+        },
+        "geral": {
+          "type": "number"
+        },
+        "redDot": {
+          "type": "number"
+        },
+        "mira2x": {
+          "type": "number"
+        },
+        "mira4x": {
+          "type": "number"
+        },
+        "awm": {
+          "type": "number"
+        },
+        "olhadinha": {
+          "type": "number"
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "platform",
+        "device",
+        "geral",
+        "redDot",
+        "mira2x",
+        "mira4x",
+        "awm",
+        "olhadinha",
+        "authorId"
+      ]
+    },
+    "licenseKey": {
+      "title": "License Key",
+      "description": "Represents a license key for a product.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The unique license key string."
+        },
+        "product": {
+          "type": "string",
+          "description": "The product the key is for."
+        },
+        "duration": {
+          "type": "string",
+          "description": "The duration of the subscription."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "used"
+          ],
+          "description": "The current status of the key."
+        },
+        "usedBy": {
+          "type": "string",
+          "description": "The ID of the user who redeemed the key."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the key was created."
+        },
+        "activatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the key was activated."
+        },
+        "authorId": {
+          "type": "string",
+          "description": "The ID of the admin who generated the key."
+        }
+      },
+      "required": [
+        "key",
+        "product",
+        "status",
+        "createdAt",
+        "authorId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password"
+    ]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/userProfile"
+      },
+      "description": "Stores user profile information, populated from Firebase Auth."
+    },
+    "/sensitivities/{sensitivityId}": {
+      "schema": {
+        "$ref": "#/entities/sensitivity"
+      },
+      "description": "Stores all sensitivity profiles created by users."
+    },
+    "/licenseKeys/{licenseKeyId}": {
+      "schema": {
+        "$ref": "#/entities/licenseKey"
+      },
+      "description": "Stores all generated license keys."
+    }
+  }
+}

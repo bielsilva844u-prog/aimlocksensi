@@ -1,0 +1,16 @@
+{
+  "placeholderImages": [
+    {
+      "id": "aimlok-sensi-icon",
+      "description": "Aimlok Sensi Icon",
+      "imageUrl": "https://i.ibb.co/YBXPmGmq/download.png",
+      "imageHint": "gaming icon"
+    },
+    {
+      "id": "product-panel-image",
+      "description": "Panel App Image",
+      "imageUrl": "https://i.ibb.co/8M3YJcM/panel-app-image.png",
+      "imageHint": "app interface"
+    }
+  ]
+}
