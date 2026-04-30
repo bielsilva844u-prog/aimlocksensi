@@ -1,40 +1,66 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import {
-  Target,
-  Settings,
-  SlidersHorizontal,
-  Package,
-  X,
-  RefreshCw,
-  Rocket,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+interface ToggleRowProps {
+  label: string;
+  defaultOn?: boolean;
+}
+
+interface RangeRowProps {
+  label: string;
+  min: number;
+  max: number;
+  defaultValue: number;
+}
 
 function LoadingScreen() {
   return (
-    <div className="flex flex-col gap-4 justify-center items-center h-screen bg-[#0d0404]">
-      <RefreshCw className="h-10 w-10 animate-spin text-primary" />
-      <p className="text-lg font-semibold text-white tracking-wider">
+    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#111214]">
+      <RefreshCw className="h-10 w-10 animate-spin text-[#9b8fff]" />
+      <p className="text-lg font-semibold tracking-wider text-white">
         Verificando acesso...
       </p>
+    </div>
+  );
+}
+
+function ToggleRow({ label, defaultOn = false }: ToggleRowProps) {
+  const [enabled, setEnabled] = useState(defaultOn);
+
+  return (
+    <button type="button" className="mod-row" onClick={() => setEnabled((value) => !value)}>
+      <span className={cn('mod-rlabel', enabled && 'on')}>{label}</span>
+      <span className={cn('mod-tog', enabled && 'on')}>
+        <span className="mod-tog-k" />
+      </span>
+    </button>
+  );
+}
+
+function RangeRow({ label, min, max, defaultValue }: RangeRowProps) {
+  const [value, setValue] = useState(defaultValue);
+
+  return (
+    <div className="mod-srow">
+      <div className="mod-slabel">
+        <span>{label}</span>
+        <em>{value}</em>
+      </div>
+      <input
+        className="mod-range"
+        type="range"
+        min={min}
+        max={max}
+        step="1"
+        value={value}
+        onChange={(event) => setValue(Number(event.target.value))}
+      />
     </div>
   );
 }
@@ -43,14 +69,18 @@ export default function AuxilioIphonePage() {
   const { user, loading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
+  const [injecting, setInjecting] = useState(false);
+  const [injected, setInjected] = useState(false);
+  const [fps, setFps] = useState(144);
+  const [ping, setPing] = useState(22);
 
   useEffect(() => {
-    if (loading) return; // Wait until loading is complete
+    if (loading) return;
     if (!user) {
       toast({
         variant: 'destructive',
         title: 'Acesso Negado',
-        description: 'Você precisa estar logado para acessar esta página.',
+        description: 'Voce precisa estar logado para acessar esta pagina.',
       });
       router.push('/login');
       return;
@@ -58,233 +88,114 @@ export default function AuxilioIphonePage() {
     if (!user.activatedProducts?.includes('AUXILIO-IPHONE')) {
       toast({
         variant: 'destructive',
-        title: 'Produto não ativado',
-        description:
-          'Você não tem acesso ao AUXILIO DE MIRA IPHONE. Ative uma chave para continuar.',
+        title: 'Produto nao ativado',
+        description: 'Voce nao tem acesso ao AUXILIO DE MIRA IPHONE. Ative uma chave para continuar.',
       });
       router.push('/inicio');
     }
   }, [user, loading, router, toast]);
 
-  const [activeTab, setActiveTab] = useState('aimbot');
-  const [precision, setPrecision] = useState(false);
-  const [diminuirRecuo, setDiminuirRecuo] = useState(false);
-  const [forcarTravada, setForcarTravada] = useState('cabeça');
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFps(138 + Math.floor(Math.random() * 13));
+      setPing(18 + Math.floor(Math.random() * 10));
+    }, 900);
 
-  const [isInjecting, setIsInjecting] = useState(false);
-  const [injectionCompleted, setInjectionCompleted] = useState(false);
-  const [showLoadingModal, setShowLoadingModal] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0);
-  const loadingTexts = [
-    'Analisando sistema...',
-    'Aplicando configurações...',
-    'Injetando...',
-    'Injetado com sucesso!',
-  ];
+    return () => clearInterval(interval);
+  }, []);
 
-  const aimlokIcon = PlaceHolderImages.find(
-    (img) => img.id === 'aimlok-sensi-icon'
-  );
-
-  const tabs = [
-    { id: 'aimbot', icon: <Target className="w-6 h-6" /> },
-    { id: 'settings', icon: <Settings className="w-6 h-6" /> },
-    { id: 'adjustments', icon: <SlidersHorizontal className="w-6 h-6" /> },
-    { id: 'extra', icon: <Package className="w-6 h-6" /> },
-  ];
-
-  const handleInject = () => {
-    setIsInjecting(true);
-    setShowLoadingModal(true);
-    setLoadingStep(0);
-    setInjectionCompleted(false);
-
-    const stepDuration = 1200; // ms
-
-    setTimeout(() => setLoadingStep(1), stepDuration);
-    setTimeout(() => setLoadingStep(2), stepDuration * 2);
-    setTimeout(() => {
-      setLoadingStep(3);
-      setInjectionCompleted(true);
-    }, stepDuration * 3);
-
-    setTimeout(() => {
-      setShowLoadingModal(false);
-      setIsInjecting(false);
-    }, stepDuration * 4);
-  };
-
-  const handleOpenGame = () => {
-    // This will attempt to open the Free Fire app via its URL scheme.
-    // It will only work if the app is installed.
-    window.location.href = 'freefire://';
-  };
-
-  const handleOpenGameMax = () => {
-    // This will attempt to open the Free Fire Max app via its URL scheme.
-    // It will only work if the app is installed.
-    window.location.href = 'freefiremax://';
-  };
-
-  if (
-    loading ||
-    !user ||
-    !user.activatedProducts?.includes('AUXILIO-IPHONE')
-  ) {
+  if (loading || !user || !user.activatedProducts?.includes('AUXILIO-IPHONE')) {
     return <LoadingScreen />;
   }
 
+  const handleInject = () => {
+    setInjecting(true);
+    setTimeout(() => {
+      setInjecting(false);
+      setInjected(true);
+      toast({
+        title: 'Injetado com sucesso',
+        description: 'O auxilio de mira foi aplicado.',
+      });
+    }, 3000);
+  };
+
+  const handleOpenFreeFire = () => {
+    window.location.href = 'freefire://';
+  };
+
+  const handleSaveConfig = () => {
+    toast({
+      title: 'Config salva',
+      description: 'Sua configuracao foi salva com sucesso.',
+    });
+  };
+
   return (
-    <div className="headtrick-panel-bg">
-      <div className="panel-container">
-        {/* Sidebar */}
-        <div className="panel-sidebar">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'sidebar-button',
-                activeTab === tab.id && 'active'
-              )}
-            >
-              {tab.icon}
+    <div className="mod-wrap">
+      <div className="mod-panel">
+        <div className="mod-topbar">
+          <div className="mod-tabs">
+            <button type="button" className="mod-tab mod-tab-title on">
+              Auxilio de Mira
             </button>
-          ))}
+          </div>
+          <div className="mod-corner">
+            <div className={cn('mod-dot2', !injected && 'off')} />
+            <span className="mod-corner-txt">{injected ? 'ACTIVE' : 'OFF'}</span>
+          </div>
         </div>
 
-        {/* Main Content */}
-        <div className="panel-main">
-          {/* Header */}
-          <div className="panel-header">
-            <div className="flex items-center gap-3">
-              <Target className="w-5 h-5" />
-              <h1 className="text-lg font-bold tracking-wider">
-                AUXILIO DE MIRA IPHONE
-              </h1>
-            </div>
-            <Link href="/inicio" className="close-button">
-              <X className="w-4 h-4" />
-            </Link>
-          </div>
-
-          {/* Body */}
-          <div className="panel-body justify-between">
-            <div className="flex flex-col gap-6">
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  id="precision"
-                  checked={precision}
-                  onCheckedChange={(c) => setPrecision(!!c)}
-                  className="w-5 h-5 rounded-[4px] border-muted-foreground/80 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                />
-                <Label
-                  htmlFor="precision"
-                  className="text-base text-white font-medium -translate-y-px"
-                >
-                  Precision
-                </Label>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  id="diminuir-recuo"
-                  checked={diminuirRecuo}
-                  onCheckedChange={(c) => setDiminuirRecuo(!!c)}
-                  className="w-5 h-5 rounded-[4px] border-muted-foreground/80 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                />
-                <Label
-                  htmlFor="diminuir-recuo"
-                  className="text-base text-white font-medium -translate-y-px"
-                >
-                  Diminuir recuo
-                </Label>
-              </div>
-
-              <div className="space-y-3 pt-6">
-                <Label className="text-xs font-bold tracking-widest uppercase text-muted-foreground">
-                  FORÇAR TRAVADA:
-                </Label>
-                <Select value={forcarTravada} onValueChange={setForcarTravada}>
-                  <SelectTrigger className="w-full gerador-select text-base h-12">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0d0404] border-primary/30 text-white">
-                    <SelectItem value="cabeça">Cabeça</SelectItem>
-                    <SelectItem value="pescoço">Pescoço</SelectItem>
-                    <SelectItem value="peito">Peito</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4 mt-8">
-              <Button
-                size="lg"
-                className="w-full gerador-button text-base tracking-widest font-bold h-14"
-                onClick={handleInject}
-                disabled={isInjecting}
-              >
-                {isInjecting ? (
-                  <>
-                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                    INJETANDO...
-                  </>
-                ) : injectionCompleted ? (
-                  'RE-INJETAR'
-                ) : (
-                  'INJETAR'
-                )}
-              </Button>
-              {injectionCompleted && (
-                <>
-                  <Button
-                    size="lg"
-                    className="w-full gerador-button text-base tracking-widest font-bold h-14"
-                    onClick={handleOpenGame}
-                  >
-                    <Rocket className="mr-2 h-5 w-5" />
-                    ABRIR FREE FIRE
-                  </Button>
-                  <Button
-                    size="lg"
-                    className="w-full gerador-button text-base tracking-widest font-bold h-14"
-                    onClick={handleOpenGameMax}
-                  >
-                    <Rocket className="mr-2 h-5 w-5" />
-                    ABRIR FREE FIRE MAX
-                  </Button>
-                </>
-              )}
+        <div className="mod-pane on">
+          <div className="mod-body mod-body-single">
+            <div className="mod-col">
+              <div className="mod-sec">Aimbot</div>
+              <ToggleRow label="Aimbot" defaultOn />
+              <ToggleRow label="Silent aim" defaultOn />
+              <ToggleRow label="FOV circle" />
+              <ToggleRow label="Silent aim FOV" defaultOn />
+              <div className="mod-divider" />
+              <RangeRow label="FOV size" min={0} max={180} defaultValue={37} />
+              <RangeRow label="Head priority" min={0} max={100} defaultValue={0} />
+              <RangeRow label="Scope offset" min={0} max={100} defaultValue={0} />
             </div>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="panel-footer">
-            <p>Todos os direitos reservados</p>
-            <div
-              className="flex justify-center items-center gap-1.5 text-primary font-bold"
-              style={{ margin: '4px 0' }}
+        <div className="mod-footer">
+          <div className="mod-ft-l">
+            <div className="mod-ft-stat">
+              fps <span>{fps}</span>
+            </div>
+            <div className="mod-ft-stat">
+              ping <span>{ping}ms</span>
+            </div>
+          </div>
+          <div className="mod-footer-actions">
+            {injected && (
+              <button type="button" className="mod-save-inline-btn" onClick={handleSaveConfig}>
+                <img src="https://i.ibb.co/XxxxfVQf/1160356.png" alt="" className="mod-save-icon" />
+                SALVAR CONFIG
+              </button>
+            )}
+            <button
+              type="button"
+              className="mod-inject-btn"
+              onClick={injected ? handleOpenFreeFire : handleInject}
+              disabled={injecting}
             >
-              {aimlokIcon && (
-                <Image
-                  src={aimlokIcon.imageUrl}
-                  alt={aimlokIcon.description}
-                  width={20}
-                  height={20}
-                  data-ai-hint={aimlokIcon.imageHint}
-                />
-              )}
-              <span>aimlock.sensi</span>
-            </div>
+              {injecting ? 'INJETANDO...' : injected ? 'ABRIR O FREE FIRE' : 'INJETAR'}
+            </button>
           </div>
         </div>
       </div>
-      {showLoadingModal && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm">
-          <RefreshCw className="h-10 w-10 animate-spin text-primary" />
-          <p className="mt-4 text-center text-lg font-semibold text-white tracking-wider">
-            {loadingTexts[loadingStep]}
-          </p>
+
+      {injecting && (
+        <div className="mod-inject-popup">
+          <div className="mod-inject-box">
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+            <p>Injetando...</p>
+          </div>
         </div>
       )}
     </div>

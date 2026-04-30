@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -12,10 +13,14 @@ const purchases = [
 ];
 
 export default function PurchaseNotification() {
+  const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(false);
   const [currentPurchaseIndex, setCurrentPurchaseIndex] = useState(0);
+  const hiddenRoutes = ['/login', '/registrar', '/auxilio-iphone', '/auxilio-android', '/admin', '/conta', '/headtrick', '/gerador'];
 
   useEffect(() => {
+    if (hiddenRoutes.includes(pathname)) return;
+
     const initialTimeout = setTimeout(() => {
       setIsVisible(true);
     }, 3000);
@@ -32,7 +37,11 @@ export default function PurchaseNotification() {
       clearTimeout(initialTimeout);
       clearInterval(interval);
     };
-  }, []);
+  }, [pathname]);
+
+  if (hiddenRoutes.includes(pathname)) {
+    return null;
+  }
 
   const currentPurchase = purchases[currentPurchaseIndex];
 

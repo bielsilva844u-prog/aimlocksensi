@@ -1,326 +1,244 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronRight, RefreshCw, Copy, Lightbulb } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useEffect, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
-type SensitivityProfile = {
-    geral: number;
-    redDot: number;
-    mira2x: number;
-    mira4x: number;
-    awm: number;
-    olhadinha: number;
-};
+interface FeatureRowProps {
+  title: string;
+  defaultOn?: boolean;
+}
+
+interface RangeBlockProps {
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  value: number;
+  onChange: (value: number) => void;
+}
+
+interface GeneratedSensi {
+  miraLivre: number;
+  redDot: number;
+  scope2x: number;
+  scope4x: number;
+  sniper: number;
+  dpi: number;
+}
 
 function LoadingScreen() {
   return (
-    <div className="flex flex-col gap-4 justify-center items-center h-screen bg-[#0d0404]">
-        <RefreshCw className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-lg font-semibold text-white tracking-wider">Verificando acesso...</p>
+    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#0c0a0a]">
+      <RefreshCw className="h-10 w-10 animate-spin text-primary" />
+      <p className="text-lg font-semibold tracking-wider text-white">Verificando acesso...</p>
     </div>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function TargetIcon() {
   return (
-    <h3 className="flex items-center gap-2 text-xs font-bold text-primary tracking-widest uppercase mb-3">
-      <ChevronRight className="w-4 h-4" />
-      {children}
-    </h3>
+    <svg viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="6" />
+      <circle cx="8" cy="8" r="2" />
+      <line x1="8" y1="2" x2="8" y2="4" />
+      <line x1="8" y1="12" x2="8" y2="14" />
+      <line x1="2" y1="8" x2="4" y2="8" />
+      <line x1="12" y1="8" x2="14" y2="8" />
+    </svg>
   );
 }
 
-function OptimizationToggle({ title, subtitle, checked, onCheckedChange }: { title: string, subtitle: string, checked: boolean, onCheckedChange: (checked: boolean) => void }) {
-    return (
-        <div className="flex items-center justify-between">
-            <div>
-                <h4 className="font-semibold text-white">{title}</h4>
-                <p className={cn("text-xs uppercase tracking-wider", checked ? 'text-primary' : 'text-muted-foreground')}>{subtitle}</p>
-            </div>
-            <Switch
-                checked={checked}
-                onCheckedChange={onCheckedChange}
-            />
+function ChevronIcon() {
+  return (
+    <svg className="gs-sec-arrow" viewBox="0 0 14 14">
+      <polyline points="5,3 9,7 5,11" />
+    </svg>
+  );
+}
+
+function FeatureRow({ title, defaultOn = false }: FeatureRowProps) {
+  const [enabled, setEnabled] = useState(defaultOn);
+
+  return (
+    <div className="gs-feat-row">
+      <div>
+        <div className="gs-feat-name">{title}</div>
+        <div className={cn('gs-feat-state', enabled ? 'on' : 'off')}>
+          {enabled ? 'ATIVADO' : 'DESATIVADO'}
         </div>
-    );
+      </div>
+      <button type="button" className={cn('gs-tog', enabled && 'on')} onClick={() => setEnabled((value) => !value)}>
+        <span className="gs-tog-k" />
+      </button>
+    </div>
+  );
+}
+
+function RangeBlock({ label, min, max, step = 1, value, onChange }: RangeBlockProps) {
+  return (
+    <div className="gs-slider-block">
+      <div className="gs-slider-top">
+        <span className="gs-slider-name">{label}</span>
+        <span className="gs-slider-num">{value}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </div>
+  );
+}
+
+function rand(min: number, max: number) {
+  return Math.round(Math.random() * (max - min) + min);
 }
 
 export default function GeradorPage() {
-    const { user, loading } = useUser();
-    const router = useRouter();
-    const { toast } = useToast();
+  const { user, loading } = useUser();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [platform, setPlatform] = useState<'android' | 'ios'>('android');
+  const [game, setGame] = useState<'Free Fire' | 'Free Fire MAX'>('Free Fire');
+  const [dpi, setDpi] = useState(800);
+  const [sens, setSens] = useState(50);
+  const [freeAim, setFreeAim] = useState(72);
+  const [generated, setGenerated] = useState<GeneratedSensi | null>(null);
 
-    useEffect(() => {
-        if (loading) return; // Wait until loading is complete
-        if (!user) {
-            toast({
-                variant: 'destructive',
-                title: 'Acesso Negado',
-                description: 'Você precisa estar logado para acessar esta página.',
-            });
-            router.push('/login');
-            return;
-        }
-        if (!user.activatedProducts?.includes('GERADOR-SENSI')) {
-            toast({
-                variant: 'destructive',
-                title: 'Produto não ativado',
-                description: 'Você não tem acesso ao GERADOR DE SENSI. Ative uma chave para continuar.',
-            });
-            router.push('/inicio');
-        }
-    }, [user, loading, router, toast]);
-
-    const [platform, setPlatform] = useState('android');
-    const [device, setDevice] = useState('');
-    const [fps, setFps] = useState(true);
-    const [fullHs, setFullHs] = useState(true);
-    const [mira, setMira] = useState(false);
-
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [generatedSensi, setGeneratedSensi] = useState<SensitivityProfile | null>(null);
-
-    const [showLoadingModal, setShowLoadingModal] = useState(false);
-    const [loadingStep, setLoadingStep] = useState(0);
-    const loadingTexts = [
-        "Analisando...",
-        "Decifrando a melhor sensibilidade...",
-        "Gerando...",
-        "Sensibilidade Gerada!"
-    ];
-
-    const resultsRef = useRef<HTMLDivElement>(null);
-    
-    const aimlokIcon = PlaceHolderImages.find((img) => img.id === 'aimlok-sensi-icon');
-
-    useEffect(() => {
-        if (generatedSensi && !isGenerating) {
-            setTimeout(() => {
-                resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
-        }
-    }, [generatedSensi, isGenerating]);
-
-
-    const handleGenerate = () => {
-        setIsGenerating(true);
-        setShowLoadingModal(true);
-        setLoadingStep(0);
-
-        const stepDuration = 1200; // ms
-
-        setTimeout(() => setLoadingStep(1), stepDuration);
-
-        setTimeout(() => setLoadingStep(2), stepDuration * 2);
-
-        setTimeout(() => {
-            const sensis: SensitivityProfile = {
-                geral: Math.floor(Math.random() * (180 - 120 + 1)) + 120,
-                redDot: Math.floor(Math.random() * (180 - 120 + 1)) + 120,
-                mira2x: Math.floor(Math.random() * (180 - 120 + 1)) + 120,
-                mira4x: Math.floor(Math.random() * (180 - 120 + 1)) + 120,
-                awm: Math.floor(Math.random() * (180 - 100 + 1)) + 100,
-                olhadinha: Math.floor(Math.random() * (180 - 120 + 1)) + 120,
-            };
-            setGeneratedSensi(sensis);
-            setLoadingStep(3);
-        }, stepDuration * 3);
-
-        setTimeout(() => {
-            setShowLoadingModal(false);
-            setIsGenerating(false);
-        }, stepDuration * 4);
-    };
-
-    const handleCopy = () => {
-        if (!generatedSensi) return;
-
-        const textToCopy = `
-Estilo: Balanceada
-Geral: ${generatedSensi.geral}
-Red Dot: ${generatedSensi.redDot}
-Mira 2x: ${generatedSensi.mira2x}
-Mira 4x: ${generatedSensi.mira4x}
-AWM / Sniper: ${generatedSensi.awm}
-Olhadinha: ${generatedSensi.olhadinha}
-        `.trim().replace(/^\s+/gm, '');
-        navigator.clipboard.writeText(textToCopy);
-        toast({
-            title: "Copiado!",
-            description: "A sensibilidade foi copiada para a área de transferência.",
-        });
-    };
-
-    if (loading || !user || !user.activatedProducts?.includes('GERADOR-SENSI')) {
-        return <LoadingScreen />;
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Acesso Negado',
+        description: 'Voce precisa estar logado para acessar esta pagina.',
+      });
+      router.push('/login');
+      return;
     }
+    if (!user.activatedProducts?.includes('GERADOR-SENSI')) {
+      toast({
+        variant: 'destructive',
+        title: 'Produto nao ativado',
+        description: 'Voce nao tem acesso ao GERADOR DE SENSI. Ative uma chave para continuar.',
+      });
+      router.push('/inicio');
+    }
+  }, [user, loading, router, toast]);
 
-    return (
-        <div className="gerador-bg">
-            <div className="absolute top-4 left-4 sm:top-8 sm:left-8 z-20">
-                {aimlokIcon && (
-                    <Image
-                        src={aimlokIcon.imageUrl}
-                        alt={aimlokIcon.description}
-                        width={48}
-                        height={48}
-                        data-ai-hint={aimlokIcon.imageHint}
-                        className="rounded-md"
-                    />
-                )}
-            </div>
+  if (loading || !user || !user.activatedProducts?.includes('GERADOR-SENSI')) {
+    return <LoadingScreen />;
+  }
 
-            <div className="gerador-container">
-                <header className="text-center mb-8">
-                    <h1 className="text-3xl md:text-4xl font-headline text-primary tracking-wider">
-                        GERADOR DE
-                    </h1>
-                    <h2 className="text-3xl md:text-4xl font-headline text-white tracking-wider">
-                        SENSIBILIDADE AIMLOCK
-                    </h2>
-                    <p className="text-sm text-muted-foreground tracking-widest mt-1">
-                        OTIMIZADOR DE DPI & SENSI
-                    </p>
-                </header>
+  const handleGenerate = () => {
+    const base = sens;
+    const idealDpi = dpi <= 800 ? 800 : dpi <= 1600 ? 1200 : 1600;
 
-                <div className="space-y-8">
-                    <Tabs defaultValue="android" onValueChange={setPlatform} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 gerador-tabs-list">
-                            <TabsTrigger value="android">ANDROID</TabsTrigger>
-                            <TabsTrigger value="ios">IOS</TabsTrigger>
-                        </TabsList>
-                    </Tabs>
+    setGenerated({
+      miraLivre: rand(base - 5, base + 10),
+      redDot: rand(base - 10, base + 5),
+      scope2x: rand(Math.max(10, base - 20), base - 5),
+      scope4x: rand(Math.max(5, base - 30), base - 15),
+      sniper: rand(Math.max(3, base - 40), Math.max(5, base - 25)),
+      dpi: idealDpi,
+    });
+  };
 
-                    <div className="gerador-card">
-                        <SectionTitle>MODELO DO DISPOSITIVO</SectionTitle>
-                        <Input
-                            type="text"
-                            value={device}
-                            onChange={(e) => setDevice(e.target.value)}
-                            placeholder="Digite o modelo do seu celular"
-                            className="w-full gerador-select"
-                        />
-                    </div>
-
-                    <div className="gerador-card space-y-4">
-                        <SectionTitle>FUNÇÕES & OTIMIZAÇÃO</SectionTitle>
-                        <OptimizationToggle
-                            title="FPS a Milhão (120+ FPS)"
-                            subtitle={fps ? 'Ativado' : 'Desativado'}
-                            checked={fps}
-                            onCheckedChange={setFps}
-                        />
-                        <OptimizationToggle
-                            title="Método Full HS"
-                            subtitle={fullHs ? 'Ativado' : 'Desativado'}
-                            checked={fullHs}
-                            onCheckedChange={setFullHs}
-                        />
-                        <OptimizationToggle
-                            title="Mira Não Passar"
-                            subtitle={mira ? 'Ativado' : 'Desativado'}
-                            checked={mira}
-                            onCheckedChange={setMira}
-                        />
-                    </div>
-
-                    <Button size="lg" className="w-full gerador-button" onClick={handleGenerate} disabled={isGenerating}>
-                         {isGenerating ? (
-                            <>
-                                <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                                GERANDO...
-                            </>
-                        ) : (
-                            <>
-                                GERAR SENSIBILIDADE <ChevronRight className="w-5 h-5" />
-                            </>
-                        )}
-                    </Button>
-                </div>
-
-                {generatedSensi && (
-                    <div ref={resultsRef} className="gerador-results-container mt-12">
-                        <header className="text-center mb-8">
-                            <h2 className="text-3xl md:text-4xl font-headline text-white tracking-wider">
-                                SENSIBILIDADE GERADA
-                            </h2>
-                            <p className="text-sm text-muted-foreground tracking-widest mt-1">
-                                ESTILO: <span className="font-bold text-white">BALANCEADA</span>
-                            </p>
-                        </header>
-
-                        <div className="gerador-results-card">
-                            <ul className="sensis-list">
-                                <li className="sensis-item">
-                                    <span className="text-muted-foreground">Geral</span>
-                                    <span className="font-bold text-primary text-lg">{generatedSensi.geral}</span>
-                                </li>
-                                <li className="sensis-item">
-                                    <span className="text-muted-foreground">Red Dot</span>
-                                    <span className="font-bold text-primary text-lg">{generatedSensi.redDot}</span>
-                                </li>
-                                <li className="sensis-item">
-                                    <span className="text-muted-foreground">Mira 2x</span>
-                                    <span className="font-bold text-primary text-lg">{generatedSensi.mira2x}</span>
-                                </li>
-                                <li className="sensis-item">
-                                    <span className="text-muted-foreground">Mira 4x</span>
-                                    <span className="font-bold text-primary text-lg">{generatedSensi.mira4x}</span>
-                                </li>
-                                <li className="sensis-item">
-                                    <span className="text-muted-foreground">AWM / Sniper</span>
-                                    <span className="font-bold text-primary text-lg">{generatedSensi.awm}</span>
-                                </li>
-                                <li className="sensis-item">
-                                    <span className="text-muted-foreground">Olhadinha</span>
-                                    <span className="font-bold text-primary text-lg">{generatedSensi.olhadinha}</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div className="results-buttons grid grid-cols-2">
-                            <Button variant="outline" className="gerador-results-button generate-again" onClick={handleGenerate}>
-                                <RefreshCw /> Gerar
-                            </Button>
-                            <Button variant="secondary" className="gerador-results-button copy-all" onClick={handleCopy}>
-                                <Copy /> Copiar
-                            </Button>
-                        </div>
-
-                        <div className="gerador-tip-card">
-                            <Lightbulb className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                            <p>
-                                Dica: Esta é uma sugestão gerada. Ajuste os valores conforme seu gosto e estilo de jogo.
-                            </p>
-                        </div>
-                    </div>
-                )}
-                
-                <footer className="text-center mt-8">
-                    <p className="text-xs text-muted-foreground/50">
-                        VERSÃO 1.0 • POWERED BY AIMLOCK.SENSI
-                    </p>
-                </footer>
-            </div>
-
-            {showLoadingModal && (
-                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm">
-                    <RefreshCw className="h-10 w-10 animate-spin text-primary" />
-                    <p className="mt-4 text-center text-lg font-semibold text-white tracking-wider">
-                        {loadingTexts[loadingStep]}
-                    </p>
-                </div>
-            )}
+  return (
+    <div className="gs-app">
+      <div className="gs-hero">
+        <div className="gs-hero-badge">
+          <div className="gs-hero-badge-img">
+            <TargetIcon />
+          </div>
         </div>
-    );
+        <div className="gs-hero-line1">Gerador de</div>
+        <div className="gs-hero-line2">Sensibilidade Aimlock</div>
+        <div className="gs-hero-sub">Otimizador de DPI &amp; Sensi</div>
+      </div>
+
+      <div className="gs-os-tabs">
+        <button type="button" className={cn('gs-os-tab', platform === 'android' && 'on')} onClick={() => setPlatform('android')}>
+          Android
+        </button>
+        <button type="button" className={cn('gs-os-tab', platform === 'ios' && 'on')} onClick={() => setPlatform('ios')}>
+          iOS
+        </button>
+      </div>
+
+      <div className="gs-section">
+        <div className="gs-sec-head">
+          <ChevronIcon />
+          <span className="gs-sec-label">Modelo do dispositivo</span>
+        </div>
+        <div className="gs-sec-body">
+          <input className="gs-input-field" type="text" placeholder="Digite o modelo do seu celular" />
+          <div className="gs-game-options">
+            {(['Free Fire', 'Free Fire MAX'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={cn('gs-game-option', game === option && 'on')}
+                onClick={() => setGame(option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="gs-section">
+        <div className="gs-sec-head">
+          <ChevronIcon />
+          <span className="gs-sec-label">Funcoes &amp; Otimizacao</span>
+        </div>
+        <div className="gs-sec-body">
+          <FeatureRow title="FPS a Milhao (120+ FPS)" defaultOn />
+          <FeatureRow title="Metodo Full HS" defaultOn />
+          <FeatureRow title="Mira Nao Passar" />
+          <FeatureRow title="Anti Recoil" />
+        </div>
+      </div>
+
+      <div className="gs-slider-section">
+        <RangeBlock label="DPI base" min={200} max={3200} step={50} value={dpi} onChange={setDpi} />
+        <RangeBlock label="Sensibilidade geral" min={1} max={100} value={sens} onChange={setSens} />
+        <RangeBlock label="Mira livre" min={1} max={100} value={freeAim} onChange={setFreeAim} />
+      </div>
+
+      <button type="button" className="gs-gen-btn" onClick={handleGenerate}>
+        Gerar Sensibilidade
+        <svg viewBox="0 0 16 16">
+          <polyline points="6,3 11,8 6,13" />
+        </svg>
+      </button>
+
+      {generated && (
+        <div className="gs-result-box show">
+          <div className="gs-result-title">Sua sensibilidade gerada</div>
+          <div className="gs-result-grid">
+            <div className="gs-rcard"><div className="gs-rcard-label">Mira livre</div><div className="gs-rcard-val">{generated.miraLivre}<span> geral</span></div></div>
+            <div className="gs-rcard"><div className="gs-rcard-label">Mira c/ escopo</div><div className="gs-rcard-val">{generated.redDot}<span> red dot</span></div></div>
+            <div className="gs-rcard"><div className="gs-rcard-label">2x escopo</div><div className="gs-rcard-val">{generated.scope2x}<span> 2x</span></div></div>
+            <div className="gs-rcard"><div className="gs-rcard-label">4x escopo</div><div className="gs-rcard-val">{generated.scope4x}<span> 4x</span></div></div>
+            <div className="gs-rcard"><div className="gs-rcard-label">Sniper</div><div className="gs-rcard-val">{generated.sniper}<span> sniper</span></div></div>
+            <div className="gs-rcard"><div className="gs-rcard-label">DPI ideal</div><div className="gs-rcard-val">{generated.dpi}<span> DPI</span></div></div>
+          </div>
+        </div>
+      )}
+
+      <div className="gs-foot">
+        <div className="gs-foot-txt">Versao 1.0 - Powered by</div>
+        <div className="gs-foot-brand">aimlock.sensi</div>
+      </div>
+    </div>
+  );
 }
